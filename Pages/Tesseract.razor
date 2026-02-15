@@ -1,0 +1,26 @@
+﻿@page "/tesseract"
+@inject IJSRuntime JS
+
+<h3 style="margin-bottom: 0.75rem;">Rotierender 4D-Würfel (Tesseract)</h3>
+
+<canvas id="@CanvasId" style="width: 100%; height: min(70vh, 700px); border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);"></canvas>
+
+@code {
+    private readonly string CanvasId = "tesseractCanvas";
+    private bool _started;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_started)
+        {
+            _started = true;
+            await JS.InvokeVoidAsync("tesseractRenderer.start", CanvasId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        // Stop rendering when navigating away.
+        await JS.InvokeVoidAsync("tesseractRenderer.stop");
+    }
+}
