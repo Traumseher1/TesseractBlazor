@@ -12,7 +12,16 @@
     /** @type {CanvasRenderingContext2D | null} */
     let ctx = null;
 
+    // "time" parameter (radians-ish scale)
     let t = 0;
+
+    // Speed multiplier controlled from Blazor
+    // 1.0 = normal, 2.0 = double speed, 0.5 = half speed
+    let speed = 1.0;
+
+    // Timestamp for framerate-independent animation
+    /** @type {number | null} */
+    let lastTs = null;
 
     // 16 vertices in 4D: all combinations of ±1 in (x,y,z,w)
     const vertices4 = [];
@@ -82,8 +91,19 @@
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    function draw() {
+    function draw(ts) {
         if (!ctx || !canvas) return;
+
+        // --- Framerate-independent timing ---
+        if (lastTs === null) lastTs = ts;
+        let dt = (ts - lastTs) / 1000.0; // seconds
+        lastTs = ts;
+
+        // Clamp dt so tab-switch / lags don't cause huge jumps
+        dt = Math.min(dt, 0.05); // max 50ms step
+
+        // Advance "t" with speed factor
+        t += dt * speed;
 
         resizeToDisplaySize();
 
@@ -107,13 +127,13 @@
         for (let i = 0; i < 16; i++) {
             const p = vertices4[i].slice(); // [x,y,z,w]
 
-            // 4D rotations (tweak these to taste)
-            rotatePlane(p, 0, 3, t * 0.7); // x-w
-            rotatePlane(p, 1, 3, t * 0.5); // y-w
-            rotatePlane(p, 2, 3, t * 0.3); // z-w
+            // 4D rotations
+            rotatePlane(p, 0, 3, t * 0.7);  // x-w
+            rotatePlane(p, 1, 3, t * 0.5);  // y-w
+            rotatePlane(p, 2, 3, t * 0.3);  // z-w
 
-            // Also rotate a bit in 3D planes for richer motion
-            rotatePlane(p, 0, 1, t * 0.4); // x-y
+            // Also rotate in 3D planes for richer motion
+            rotatePlane(p, 0, 1, t * 0.4);  // x-y
             rotatePlane(p, 1, 2, t * 0.35); // y-z
 
             // Project 4D -> 3D -> 2D
@@ -164,13 +184,17 @@
             ctx.fill();
         }
 
-        t += 0.016; // approx 60 FPS step
         rafId = requestAnimationFrame(draw);
+    }
+
+    function resetTiming() {
+        // Resets time base so animation restarts smoothly.
+        t = 0;
+        lastTs = null;
     }
 
     window.tesseractRenderer = {
         start: function (canvasId) {
-            // Start rendering on the given canvas element id.
             canvas = document.getElementById(canvasId);
             if (!canvas) return;
 
@@ -178,15 +202,26 @@
             if (!ctx) return;
 
             if (rafId !== null) cancelAnimationFrame(rafId);
-            t = 0;
+            resetTiming();
+
             rafId = requestAnimationFrame(draw);
         },
+
         stop: function () {
-            // Stop animation loop.
             if (rafId !== null) cancelAnimationFrame(rafId);
             rafId = null;
             canvas = null;
             ctx = null;
+            lastTs = null;
+        },
+
+        setSpeed: function (value) {
+            // value: number, expected range e.g. 0..5
+            const v = Number(value);
+            if (!Number.isFinite(v)) return;
+
+            // Clamp to sensible range
+            speed = Math.max(0.0, Math.min(10.0, v));
         }
     };
 })();

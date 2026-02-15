@@ -1,26 +1,70 @@
 ﻿@page "/tesseract"
+@implements IAsyncDisposable
 @inject IJSRuntime JS
 
 <h3 style="margin-bottom: 0.75rem;">Rotierender 4D-Würfel (Tesseract)</h3>
 
-<canvas id="@CanvasId" style="width: 100%; height: min(70vh, 700px); border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);"></canvas>
+<div style="display:flex; align-items:center; gap:12px; margin-bottom: 12px;">
+    <label style="min-width: 180px;">Speed: <b>@_speed.ToString("0.0")</b></label>
+
+    <input type="range"
+           min="0"
+           max="4"
+           step="0.01"
+           value="@_speed"
+           @oninput="OnSpeedChanged"
+           style="width: min(520px, 100%);" />
+
+    <button @onclick="ResetSpeed"
+            style="padding:6px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: white;">
+        Reset
+    </button>
+</div>
+
+<canvas id="@CanvasId"
+        style="width: 100%; height: min(70vh, 700px); border-radius: 14px; border: 1px solid rgba(255,255,255,0.12);"></canvas>
 
 @code {
     private readonly string CanvasId = "tesseractCanvas";
     private bool _started;
+    private double _speed = 1.0;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender && !_started)
         {
             _started = true;
+
             await JS.InvokeVoidAsync("tesseractRenderer.start", CanvasId);
+            await JS.InvokeVoidAsync("tesseractRenderer.setSpeed", _speed);
         }
+    }
+
+    private async Task OnSpeedChanged(ChangeEventArgs e)
+    {
+        if (e.Value is null) return;
+
+        if (double.TryParse(e.Value.ToString(), out var v))
+        {
+            _speed = v;
+
+            if (_started)
+                await JS.InvokeVoidAsync("tesseractRenderer.setSpeed", _speed);
+        }
+    }
+
+    private async Task ResetSpeed()
+    {
+        _speed = 0.5;
+
+        if (_started)
+            await JS.InvokeVoidAsync("tesseractRenderer.setSpeed", _speed);
     }
 
     public async ValueTask DisposeAsync()
     {
         // Stop rendering when navigating away.
-        await JS.InvokeVoidAsync("tesseractRenderer.stop");
+        if (_started)
+            await JS.InvokeVoidAsync("tesseractRenderer.stop");
     }
 }
